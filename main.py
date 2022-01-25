@@ -80,10 +80,10 @@ class Worker(QObject):
             # Enter meeting passcode
             self.type_string('images/meeting_passcode.png', meeting_passcode)
             coords = self.locate_image_coords('images/join_meeting.png')
-        if coords is None:
-            self.error.emit()
-            return
-        self.press(coords)
+            if coords is None:
+                self.error.emit()
+                return
+            self.press(coords)
         self.finished.emit()
 
 class Window(QWidget):
