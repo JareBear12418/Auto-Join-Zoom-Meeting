@@ -80,10 +80,10 @@ class Worker(QObject):
             # Enter meeting passcode
             self.type_string('images/meeting_passcode.png', meeting_passcode)
             coords = self.locate_image_coords('images/join_meeting.png')
-            if coords is None:
-                self.error.emit()
-                return
-            self.press(coords)
+        if coords is None:
+            self.error.emit()
+            return
+        self.press(coords)
         self.finished.emit()
 
 class Window(QWidget):
@@ -93,7 +93,6 @@ class Window(QWidget):
         self.setFixedWidth(1300)
         self.setWindowIcon(QIcon('images/icon.ico'))
         layout: QVBoxLayout() = QVBoxLayout(self)
-
         grid_layout = QGridLayout(self)
         grid_layout.setSpacing(10)
 
@@ -107,7 +106,7 @@ class Window(QWidget):
             button = Button(meeting[0], self)
             button.clicked.connect(partial(self.join_zoom_meeting, meeting[1], meeting[2]))
             button.entered.connect(self.handle_entered)
-            button.setStyleSheet('QPushButton{border-radius: 25px; border-style: none; background-color: #0E72ED; color: white; font-size: 25px; font-weight: bold;} QPushButton:hover{background-color: #0D68D8;}')
+            button.setStyleSheet('QPushButton{border-radius: 25px; border-style: none; background-color: #0E72ED; color: white; font-size: 25px; font-weight: bold;} QPushButton:hover{background-color: #0D68D8;} QPushButton:pressed{background-color: #235DB4;}')
             button.leaved.connect(self.handle_leaved)
             if meeting[2] is None:
                 button.setToolTip(f'ID: {meeting[1]}')
