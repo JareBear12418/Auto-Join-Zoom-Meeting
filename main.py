@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QLabel, QGridLayout, QMessageBox
+from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QLabel, QGridLayout, QMessageBox, QCheckBox
 from PyQt5.QtCore import Qt, pyqtSignal, QObject, QThread
 from PyQt5.QtGui import QIcon
 import sys
@@ -15,6 +15,8 @@ sheet = wb['Sheet1']
 meetings = [i for i in sheet.iter_rows(values_only=True) if i[0] != None]
 meetings.pop(0)
 meetings.sort()
+
+directory = 'images/light/'
 
 class Button(QPushButton):
     entered = pyqtSignal()
@@ -38,11 +40,16 @@ class Worker(QObject):
         self.meeting_passcode = meeting_passcode
         
     def locate_image_coords(self, img: str) -> int:
+        global directory
         start_time: time.time() = time.time()
         while True:
-            coords = pyautogui.locateOnScreen(img, confidence=0.9)
+            coords = pyautogui.locateOnScreen(directory + img, confidence=0.9)
             if coords != None:
                 break
+            if 'light' in directory and (time.time() - start_time) > 4:
+                directory = directory.replace('light', 'dark')
+            elif 'dark' in directory and (time.time() - start_time) > 4:
+                directory = directory.replace('dark', 'light')
             if (time.time() - start_time) > 10:
                 return None
             time.sleep(0.1)
@@ -56,30 +63,32 @@ class Worker(QObject):
         pyautogui.typewrite(str(text))
 
     def run(self, meeting_id, meeting_passcode):
-        coords = self.locate_image_coords('images/zoom_icon.png')
+        coords = self.locate_image_coords('zoom_icon.png')
         if coords is None:
             self.error.emit()
             return
         self.press(coords)
         # Locate JOIN button (large one)
-        coords = self.locate_image_coords('images/BIG_join.png')
+        coords = self.locate_image_coords('BIG_join.png')
         if coords is None:
             self.error.emit()
             return
         # Press JOIN button (large one)
         self.press(coords)
         # Enter meeting ID
-        self.type_string('images/meeting_id.png', meeting_id)
+        self.type_string('meeting_id.png', meeting_id)
         # Press JOIN button (large one)
-        coords = self.locate_image_coords('images/SMALL_join.png')
+        coords = self.locate_image_coords('SMALL_join.png')
         if coords is None:
             self.error.emit()
             return
+        
         self.press(coords)
+        
         if meeting_passcode is not None:
             # Enter meeting passcode
-            self.type_string('images/meeting_passcode.png', meeting_passcode)
-            coords = self.locate_image_coords('images/join_meeting.png')
+            self.type_string('meeting_passcode.png', meeting_passcode)
+            coords = self.locate_image_coords('join_meeting.png')
         if coords is None:
             self.error.emit()
             return
@@ -92,14 +101,14 @@ class Window(QWidget):
         self.setWindowTitle("Auto Join Zoom Meeting")
         self.setFixedWidth(1300)
         self.setWindowIcon(QIcon('images/icon.ico'))
+        self.dark_mode: bool = False
         layout: QVBoxLayout() = QVBoxLayout(self)
         grid_layout = QGridLayout(self)
         grid_layout.setSpacing(10)
 
-        lbl: QLabel() = QLabel("Press the meeting you'd like to join:", self)
-        lbl.setStyleSheet('QLabel{font-size: 40px; color: #39394D; font-weight: bold;}')
-        lbl.setFixedHeight(120)
-        layout.addWidget(lbl)
+        self.lbl: QLabel() = QLabel("Press the meeting you'd like to join:", self)
+        self.lbl.setFixedHeight(120)
+        layout.addWidget(self.lbl)
 
         colSize = 2
         for i, meeting in enumerate(meetings):
@@ -116,9 +125,46 @@ class Window(QWidget):
             grid_layout.addWidget(button, int(i/colSize), int(i%colSize))
         layout.addLayout(grid_layout)
 
+        self.checkBoxDarkTheme = QCheckBox(self)
+        self.load_theme()
+        self.checkBoxDarkTheme.setText("Dark mode")
+        self.checkBoxDarkTheme.setStatusTip("Check this if zoom has darkmode enabled.")
+        self.checkBoxDarkTheme.toggled.connect(self.toggle_theme)
+        layout.addWidget(self.checkBoxDarkTheme)
+        
         self.setLayout(layout)
         self.show()
     
+    def load_theme(self):
+        with open('zoom_theme', 'r') as f:
+            text = f.read()
+            self.dark_mode = text == 'true'
+        self.checkBoxDarkTheme.setChecked(self.dark_mode)
+        if self.dark_mode:
+            self.checkBoxDarkTheme.setStyleSheet("QCheckBox::indicator { width:  20px; height: 20px;} QCheckBox {font-size: 25px; color: #F5F5F5; }")
+            self.setStyleSheet("background-color: #363636")
+            self.lbl.setStyleSheet('QLabel{font-size: 40px; color: #F5F5F5; font-weight: bold;}')
+        else:
+            self.checkBoxDarkTheme.setStyleSheet("QCheckBox::indicator { width:  20px; height: 20px;} QCheckBox {font-size: 25px; color: #39394D; }")
+            self.setStyleSheet("background-color: #FFFFFF")
+            self.lbl.setStyleSheet('QLabel{font-size: 40px; color: #39394D; font-weight: bold;}')
+    
+    def toggle_theme(self):
+        with open('zoom_theme', 'w') as f:
+            if self.dark_mode:
+                f.write('false')
+            else:
+                f.write("true")
+        self.dark_mode = not self.dark_mode
+        if self.dark_mode:
+            self.checkBoxDarkTheme.setStyleSheet("QCheckBox::indicator { width:  20px; height: 20px; } QCheckBox {font-size: 25px; color: #F5F5F5;}")
+            self.setStyleSheet("background-color: #363636")
+            self.lbl.setStyleSheet('QLabel{font-size: 40px; color: #F5F5F5; font-weight: bold;}')
+        else:
+            self.checkBoxDarkTheme.setStyleSheet("QCheckBox::indicator { width:  20px; height: 20px; } QCheckBox {font-size: 25px; color: #39394D;}")
+            self.setStyleSheet("background-color: #FFFFFF")
+            self.lbl.setStyleSheet('QLabel{font-size: 40px; color: #39394D; font-weight: bold;}')
+            
     def show_error_dialog(self):
         QMessageBox.critical(self, '10 second timeout has exceeded', "Can't proceed with the operation.\nMake sure Zoom is open.\nAborted.", QMessageBox.Ok)
     
